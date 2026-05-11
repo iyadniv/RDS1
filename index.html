@@ -1,140 +1,628 @@
 <!DOCTYPE html>
-<!--
-  © Provided by Prof. Yuseon Park
-  Hongik University, Design Research Studio, 2026
-  with support from Mindy Seu, Alvin Ashiatey
--->
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Eyes on the Road</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Unfinished Idea</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
 
-    <header>
-      <h1 id="site-title"></h1>
-      <p id="site-desc"></p>
-    </header>
+<!-- COMMENT PANEL bottom-left -->
+<div id="comment-panel">
+  <div id="cp-head">
+    <span id="cp-label"></span>
+    <button id="cp-close" onclick="closeCP()">×</button>
+  </div>
+  <div id="cp-list"></div>
+  <div id="cp-input-row">
+    <input id="cp-input" placeholder="댓글 남기기…" onkeydown="if(event.key==='Enter')addComment()"/>
+    <button onclick="addComment()">→</button>
+  </div>
+</div>
 
-    <section class="about">
-      <p id="about-text"></p>
-    </section>
+<!-- HARDCOPY POPUP (right-click) -->
+<div id="hc-popup">
+  <div id="hcp-text"></div>
+  <div id="hcp-btns">
+    <button class="hcp-yes" onclick="confirmHC()">하드카피에 저장</button>
+    <button class="hcp-no" onclick="closeHCP()">닫기</button>
+  </div>
+</div>
 
-    <section class="works">
-      <div id="grid"></div>
-    </section>
+<div id="toast"></div>
 
-    <script>
-      const SPREADSHEET_ID = "1e6MLR4Xd5vLSbgzfXjcgg2uBS6KDUwDS";
+<!-- LEFT COL fixed -->
+<div id="left-col">
+  <div id="lc-top">
+    <div id="lc-title" onclick="showPage('archive')">Unfinished<br>Idea</div>
+    <nav id="lc-nav">
+      <button class="nl active" onclick="showPage('archive')">Archive</button>
+      <button class="nl" onclick="showPage('gallery')">Gallery</button>
+      <button class="nl" onclick="showPage('hardcopy')">Hardcopy<span id="hc-badge"></span></button>
+    </nav>
+  </div>
+  <div id="lc-bottom">
+    <div id="lc-count"><span id="s-total">—</span></div>
+    <div id="lc-sub">entries</div>
+  </div>
+</div>
 
-      const KEYS = {
-        title:       "Meta-Title",
-        description: "Meta-Description",
-        about:       "About",
-        project:     "UL-Project",
-        date:        "UL-Date",
-        location:    "UL-Location",
-        note:        "UL-Note",
-        image:       "UL-Images",
-      };
+<!-- RIGHT COL scrollable -->
+<div id="right-col">
 
-      const CSV_URL =
-        `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+  <!-- ARCHIVE -->
+  <div class="page active" id="page-archive">
+    <div id="archive-loading">loading…</div>
+    <div id="archive-body"></div>
+  </div>
 
-      function parseCSV(text) {
-        const lines = text.trim().split("\n");
-        const headers = splitCSVLine(lines[0]);
-        return lines.slice(1).map((line) => {
-          const values = splitCSVLine(line);
-          const obj = {};
-          headers.forEach((h, i) => {
-            obj[h.trim()] = (values[i] || "").trim();
-          });
-          return obj;
-        });
-      }
+  <!-- GALLERY -->
+  <div class="page" id="page-gallery">
+    <div class="gallery-controls">
+      <button class="fc active" onclick="sortG(this,'num')">번호순</button>
+      <button class="fc" onclick="sortG(this,'disc')">분야순</button>
+      <button class="fc" onclick="sortG(this,'year')">연도순</button>
+      <div class="vt">
+        <button class="vb active" onclick="setView(this,'grid')">Grid</button>
+        <button class="vb" onclick="setView(this,'list')">List</button>
+      </div>
+    </div>
+    <div id="gallery-grid"></div>
+  </div>
 
-      function splitCSVLine(line) {
-        const result = [];
-        let current = "";
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') {
-            inQuotes = !inQuotes;
-          } else if (ch === "," && !inQuotes) {
-            result.push(current);
-            current = "";
-          } else {
-            current += ch;
-          }
+  <!-- HARDCOPY -->
+  <div class="page" id="page-hardcopy">
+    <div class="page-head">
+      <div class="ph-title">Hardcopy</div>
+      <div class="ph-sub">클릭해 저장한 항목들</div>
+    </div>
+    <div id="hc-entries"></div>
+    <div id="hc-bar" style="display:none">
+      <span id="hc-info"></span>
+      <button class="export-btn" onclick="window.print()">인쇄 →</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SHEET_ID = "1QINNVMdMk2ZnMyzh-z_UzJMEInlJ7fwhogEtnsjIAfg";
+const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+// ══════════════════════════════════════════════════════════
+//  KEYWORDS — 직접 편집하세요
+//  각 필드의 keywords 배열에 형광펜 처리할 단어를 입력
+//  빈 배열 [] 이면 해당 필드는 형광펜 없음
+// ══════════════════════════════════════════════════════════
+const ANSWER_FIELDS = [
+  { key: "Project name",
+    color: "#0004FF",
+    keywords: [] },
+
+  { key: "Discipline",
+    color: "#00FF33",
+    keywords: ["3D","그래픽","타이포그라피","UX/UI","브랜딩","인터렉션","일러스트레이션","사진","입체","제품 디자인","영상","광고"] },
+
+  { key: "Year",
+    color: "#FFAA00",
+    keywords: ["2023","2024","2025","2026"] },
+
+  { key: "Collaboration type",
+    color: "#C700DD",
+    keywords: ["팀","개인"] },
+
+  { key: "Context",
+    color: "#00862D",
+    keywords: ["수업 과제","개인 프로젝트","공모전","동아리 프로젝트","스터디","산학"] },
+
+  { key: "Stage of abandonment",
+    color: "#7AF1DF",
+    keywords: ["기획단계","제작 중","초기","완성","포기","중단"] },
+
+  { key: "Reason for abandonment",
+    color: "#FE1CC5",
+    keywords: ["시간 부족","시간이 없","흥미를","흥미가","의미가 있나","팀원","입대","런했","교수님","피드백","코딩 능력","필라멘트","사양"] },
+
+  { key: "Tool used",
+    color: "#89A8FF",
+    keywords: ["피그마","인디자인","일러스트레이터","포토샵","블렌더","마야","C4D","언리얼","자바스크립트","키샷","라이노","미드저니","프로크리에이트","AfterEffects"] },
+
+  { key: "Emotion",
+    color: "#AC4C21",
+    keywords: ["불안","아쉬움","후련","찝찝","짜증","슬픔","허무","막막","답답","아쉬","기대"] },
+
+  { key: "Description",
+    color: "#DDBEDA",
+    keywords: [] },
+];
+
+// keyword wrap: replaces matched words with <mark> spans
+function wrapKeywords(text, keywords, color) {
+  if (!keywords || keywords.length === 0) return esc(text);
+  const sorted = [...keywords].sort((a, b) => b.length - a.length);
+  let result = esc(text);
+  sorted.forEach(kw => {
+    if (!kw) return;
+    const escKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(
+      new RegExp(`(${escKw})`, 'g'),
+      `<mark class="kw-mark" data-kc="${color}">$1</mark>`
+    );
+  });
+  return result;
+}
+
+// Parse field text: split on [img:URL] tags (run on RAW text before esc)
+function parseFieldParts(text) {
+  const parts = [];
+  const re = /\[img:(https?:\/\/[^\]]+)\]/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type:'text', content: text.slice(last, m.index) });
+    parts.push({ type:'img', content: m[1].trim() });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ type:'text', content: text.slice(last) });
+  return parts;
+}
+
+// Render field value — text only (images extracted separately)
+function renderFieldText(val, keywords, color) {
+  const parts = parseFieldParts(val);
+  return parts
+    .filter(p => p.type === 'text')
+    .map(p => wrapKeywords(p.content, keywords, color))
+    .join('');
+}
+
+// Extract image URLs from field value
+function extractImgUrls(val) {
+  const urls = [];
+  const re = /\[img:(https?:\/\/[^\]]+)\]/g;
+  let m;
+  while ((m = re.exec(val)) !== null) urls.push(m[1].trim());
+  return urls;
+}
+
+const DISC_SLUG = d => ({"3D":"d3","그래픽":"graphic","타이포그라피":"typo","UX/UI":"ux","브랜딩":"brand","인터렉션":"inter","일러스트레이션":"illus","사진":"photo","입체":"solid","제품 디자인":"prod","영상":"video","광고":"ad"}[d] || "graphic");
+
+let ALL = [];
+const S = { hc:[], gSort:'num', gView:'grid', pendingHC:null };
+const COMMENTS = {};
+let activeCP = null;
+let hvTim = null;
+let activeKey = null;
+
+/* ── CSV (handles \r\n, multiline quoted fields) ── */
+function parseCSV(raw) {
+  // Normalize line endings
+  const text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const rows = [];
+  let headers = null;
+  let i = 0;
+
+  function readField() {
+    if (text[i] === '"') {
+      i++; // skip opening quote
+      let val = '';
+      while (i < text.length) {
+        if (text[i] === '"') {
+          if (text[i+1] === '"') { val += '"'; i += 2; } // escaped quote
+          else { i++; break; } // closing quote
+        } else {
+          val += text[i++];
         }
-        result.push(current);
-        return result;
       }
+      return val;
+    } else {
+      let val = '';
+      while (i < text.length && text[i] !== ',' && text[i] !== '\n') {
+        val += text[i++];
+      }
+      return val;
+    }
+  }
 
-      fetch(CSV_URL)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.text();
-        })
-        .then((text) => {
-          const rows = parseCSV(text);
-          const first = rows[0] || {};
+  function readRow() {
+    const fields = [];
+    while (i < text.length) {
+      fields.push(readField());
+      if (text[i] === ',') { i++; }
+      else if (text[i] === '\n') { i++; break; }
+      else { break; }
+    }
+    return fields;
+  }
 
-          // 메타 정보
-          document.getElementById("site-title").textContent = first[KEYS.title]       || "";
-          document.getElementById("site-desc").textContent  = first[KEYS.description] || "";
-          document.getElementById("about-text").textContent = first[KEYS.about]       || "";
-          document.title = first[KEYS.title] || "";
+  while (i < text.length) {
+    const fields = readRow();
+    if (!headers) { headers = fields.map(h => h.trim()); }
+    else {
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = (fields[j] || '').trim(); });
+      if (obj["Project name"]) rows.push(obj);
+    }
+  }
+  return rows;
+}
 
-          const grid = document.getElementById("grid");
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-          rows.forEach((row) => {
-            if (!row[KEYS.project]) return;
+/* ── BUILD ARCHIVE ──────────────────────────────────────
+   Each entry = one paragraph
+   Each field = a .seg span
+   Inside active seg: keywords get .kw-mark (fluorescent box)
+   Non-active segs dim to gray
+─────────────────────────────────────────────────────── */
+function buildArchive(rows) {
+  return rows.map((row, ri) => {
+    const id = row["Index"] || (ri + 1);
 
-            const card = document.createElement("div");
-            card.className = "card";
+    const segments = ANSWER_FIELDS.map(({ key, color, keywords }) => {
+      const val = (row[key] || '').trim();
+      if (!val) return '';
+      const cmtKey = `${id}::${key}`;
+      const count = (COMMENTS[cmtKey] || []).length;
+      const dots = count
+        ? `<span class="seg-dots" style="--sc:${color}">${'<i class="seg-dot"></i>'.repeat(count)}</span>`
+        : '';
 
-            if (row[KEYS.image]) {
-              const img = document.createElement("img");
-              img.src     = row[KEYS.image];
-              img.alt     = row[KEYS.project];
-              img.loading = "lazy";
-              card.appendChild(img);
-            }
+      // parse [img:URL] inline — images go exactly where written in text
+      const parts = parseFieldParts(val);
+      const inner = parts.map(p => {
+        if (p.type === 'img') {
+          const safeUrl = p.content.replace(/"/g, '&quot;');
+          return `<img class="inline-img" src="${safeUrl}" alt="" loading="lazy"
+            onclick="event.stopPropagation(); toggleImgExpand(this)"
+            onerror="this.style.display='none'"/>`;
+        }
+        return wrapKeywords(p.content, keywords, color);
+      }).join('');
 
-            const body = document.createElement("div");
-            body.className = "card-body";
+      const segEl = `<span class="seg" data-id="${id}" data-key="${key}" style="--sc:${color}"
+        onmouseenter="segHover(this)" onmouseleave="segLeave()"
+      >${inner}${dots}</span>`;
+      return segEl;
+    }).filter(Boolean);
 
-            const year     = row[KEYS.date]
-              ? Math.floor(Number(row[KEYS.date])) || row[KEYS.date]
-              : "";
-            const location = row[KEYS.location] || "";
-            const note     = row[KEYS.note]     || "";
+    if (!segments.length) return '';
+    return `<p class="entry-p" id="ep-${id}" data-id="${id}">${segments.join(' ')}</p>`;
+  }).filter(Boolean).join('\n');
+}
 
-            body.innerHTML = `
-              <p class="project-name">${row[KEYS.project]}</p>
-              <p class="project-meta">${[year, location].filter(Boolean).join(" | ")}</p>
-              ${note ? `<p class="project-note">${note}</p>` : ""}
-            `;
+function segHover(el) {
+  clearTimeout(hvTim);
+  const key = el.dataset.key;
+  if (key === activeKey) return;
+  activeKey = key;
+  document.querySelectorAll('.seg').forEach(s => {
+    const on = s.dataset.key === key;
+    const color = s.style.getPropertyValue('--sc') || '#111';
+    s.classList.toggle('seg-on', on);
+    if (on) {
+      // entire seg text color changes
+      s.style.color = color;
+      s.querySelectorAll('.kw-mark').forEach(m => {
+        m.style.color = m.dataset.kc || color;
+      });
+    } else {
+      s.style.color = '';
+      s.querySelectorAll('.kw-mark').forEach(m => { m.style.color = ''; });
+    }
+  });
+}
 
-            card.appendChild(body);
-            grid.appendChild(card);
-          });
-        })
-        .catch((err) => {
-          console.error("Error:", err);
-          document.getElementById("grid").innerHTML =
-            `<p style="color:red">
-              Failed to load data.<br>
-              ① Check sharing settings — set to "Anyone with the link (Viewer)"<br>
-              ② Check Spreadsheet ID<br>
-              ③ Open with Live Server or GitHub Pages (file:// won't work)
-            </p>`;
-        });
-    </script>
-  </body>
+function segLeave() {
+  hvTim = setTimeout(() => {
+    activeKey = null;
+    document.querySelectorAll('.seg').forEach(s => {
+      s.classList.remove('seg-on');
+      s.style.color = '';
+      s.querySelectorAll('.kw-mark').forEach(m => { m.style.color = ''; });
+    });
+  }, 80);
+}
+/* ── IMAGE EXPAND ──────────────────────────────────────
+   클릭 → 이미지가 fixed fullscreen 블러 배경으로 확장
+   텍스트는 z-index 높아서 그 위에 그대로 보임
+   스크롤 가능. 다시 클릭하거나 ESC로 닫힘
+─────────────────────────────────────────────────────── */
+let expandedImg = null;
+
+function toggleImgExpand(img) {
+  if (expandedImg) { collapseImg(); return; }
+  expandImg(img);
+}
+
+function expandImg(img) {
+  expandedImg = img;
+  document.getElementById('img-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'img-overlay';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    top: '0', left: '0',
+    width: '100vw', height: '100vh',
+    zIndex: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+    opacity: '0',
+    transition: 'opacity 0.25s ease',
+    pointerEvents: 'none',   /* 클릭 이벤트 통과 — 텍스트 클릭 정상 작동 */
+  });
+
+  const blurImg = document.createElement('img');
+  Object.assign(blurImg.style, {
+    display: 'block',
+    maxWidth: '100vw',
+    maxHeight: '100vh',
+    width: 'auto',
+    height: 'auto',
+    objectFit: 'contain',
+    filter: 'blur(10px) saturate(0.65)',
+    pointerEvents: 'none',
+  });
+  blurImg.src = img.src;
+  overlay.appendChild(blurImg);
+
+  const rightCol = document.getElementById('right-col');
+  rightCol.insertBefore(overlay, rightCol.firstChild);
+  requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+}
+
+function collapseImg() {
+  expandedImg = null;
+  const overlay = document.getElementById('img-overlay');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+}
+
+/* 스크롤하면 이미지 닫힘 */
+document.getElementById('right-col').addEventListener('scroll', () => {
+  if (expandedImg) collapseImg();
+}, { passive: true });
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') collapseImg(); });
+
+/* ── COMMENT PANEL ── */
+function openCP(el) {
+  // el은 항상 .seg span
+  var id  = el.getAttribute('data-id');
+  var key = el.getAttribute('data-key');
+  if (!id || !key) return;
+
+  var val   = el.innerText || el.textContent || '';
+  val = val.trim();
+  var color = el.style.getPropertyValue('--sc') || '#999';
+  activeCP  = id + '::' + key;
+
+  document.getElementById('cp-label').textContent =
+    '"' + val.substring(0, 60) + (val.length > 60 ? '…' : '') + '"';
+  document.getElementById('cp-label').style.borderLeftColor = color;
+
+  renderCPList();
+
+  var panel = document.getElementById('comment-panel');
+  panel.style.transform = 'translateY(0)';
+  panel.classList.add('open');
+
+  setTimeout(function(){ document.getElementById('cp-input').focus(); }, 50);
+
+  S.pendingHC = { text: val, id: id,
+    source: (ALL.find(function(r){ return r['Index'] === id; }) || {})['Project name'] || '' };
+}
+
+function renderCPList() {
+  const cmts = COMMENTS[activeCP] || [];
+  document.getElementById('cp-list').innerHTML = cmts.length
+    ? cmts.map(c => `<div class="cp-item">
+        <span class="cp-text">${esc(c.text)}</span>
+        <span class="cp-meta">${c.date}${c.time ? ' · ' + c.time : ''}</span>
+      </div>`).join('')
+    : '<div class="cp-empty">아직 댓글이 없습니다</div>';
+}
+
+function addComment() {
+  if (!activeCP) return;
+  const input = document.getElementById('cp-input');
+  const val = input.value.trim();
+  if (!val) return;
+  if (!COMMENTS[activeCP]) COMMENTS[activeCP] = [];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ko-KR');
+  const timeStr = now.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
+  COMMENTS[activeCP].push({ text: val, date: dateStr, time: timeStr });
+  input.value = '';
+  renderCPList();
+  // refresh dot badge
+  const [id, key] = activeCP.split('::');
+  document.querySelectorAll(`.seg[data-id="${id}"][data-key="${key}"]`).forEach(el => {
+    let dots = el.querySelector('.seg-dots');
+    const count = COMMENTS[activeCP].length;
+    const color = el.style.getPropertyValue('--sc') || '#999';
+    if (!dots) {
+      dots = document.createElement('span');
+      dots.className = 'seg-dots';
+      dots.style.setProperty('--sc', color);
+      el.appendChild(dots);
+    }
+    dots.innerHTML = '<i class="seg-dot"></i>'.repeat(count);
+  });
+  showToast('댓글 저장됨');
+}
+
+function closeCP() {
+  const panel = document.getElementById('comment-panel');
+  panel.classList.remove('open');
+  panel.style.transform = '';
+  activeCP = null;
+}
+
+/* ── HARDCOPY (right-click) ── */
+document.addEventListener('contextmenu', e => {
+  const seg = e.target.closest('.seg');
+  if (!seg) return;
+  e.preventDefault();
+  const val = seg.innerText.trim();
+  const id  = seg.dataset.id;
+  S.pendingHC = { text: val, id, source: ALL.find(r => r["Index"] === id)?.["Project name"] || '' };
+  const popup = document.getElementById('hc-popup');
+  document.getElementById('hcp-text').textContent = `"${val.substring(0, 80)}${val.length > 80 ? '…' : ''}"`;
+  popup.style.display = 'block';
+  popup.style.top  = Math.min(e.clientY + window.scrollY + 6, window.scrollY + window.innerHeight - 110) + 'px';
+  popup.style.left = Math.max(Math.min(e.clientX, window.innerWidth - 270), 12) + 'px';
+});
+function confirmHC() {
+  if (!S.pendingHC) return;
+  const { text, id, source } = S.pendingHC;
+  if (S.hc.find(h => h.text === text)) { showToast('이미 저장됨'); }
+  else { S.hc.push({ text, id, source, date: new Date().toLocaleDateString('ko-KR') }); updateBadge(); showToast('저장됨'); }
+  closeHCP();
+}
+function closeHCP() { S.pendingHC = null; document.getElementById('hc-popup').style.display = 'none'; }
+document.addEventListener('click', e => { if (!e.target.closest('#hc-popup')) closeHCP(); });
+function updateBadge() { document.getElementById('hc-badge').textContent = S.hc.length ? ` (${S.hc.length})` : ''; }
+
+/* ── HARDCOPY PAGE ── */
+function renderHC() {
+  const el  = document.getElementById('hc-entries');
+  const bar = document.getElementById('hc-bar');
+  if (!S.hc.length) {
+    el.innerHTML = '<div class="hc-empty">저장된 항목이 없습니다<br>항목을 우클릭해 저장하세요</div>';
+    bar.style.display = 'none'; return;
+  }
+  bar.style.display = 'flex';
+  document.getElementById('hc-info').textContent = `총 ${S.hc.length}개`;
+  el.innerHTML = S.hc.map((h, i) => `
+<div class="hc-entry">
+  <div class="hc-n">${String(i+1).padStart(2,'0')}</div>
+  <div class="hc-main">
+    <div class="hc-q">${esc(h.text)}</div>
+    <div class="hc-src">← ${esc(h.source)} · ${h.date}</div>
+  </div>
+  <button class="hc-del" onclick="delHC(${i})">×</button>
+</div>`).join('');
+}
+function delHC(i) { S.hc.splice(i, 1); renderHC(); updateBadge(); }
+
+/* ── GALLERY ── */
+function renderGallery() {
+  let rows = [...ALL];
+  if (S.gSort === 'disc') rows.sort((a, b) => (a["Discipline"] || '').localeCompare(b["Discipline"] || ''));
+  if (S.gSort === 'year') rows.sort((a, b) => (a["Year"] || 0) - (b["Year"] || 0));
+  const grid = document.getElementById('gallery-grid');
+  grid.className = 'gallery-grid' + (S.gView === 'list' ? ' lv' : '');
+  const DC = {
+    "3D":{bg:"#E0E7FF",tx:"#3730A3"},"그래픽":{bg:"#FEE2E2",tx:"#991B1B"},
+    "타이포그라피":{bg:"#EDE9FE",tx:"#5B21B6"},"UX/UI":{bg:"#D1FAE5",tx:"#065F46"},
+    "브랜딩":{bg:"#FEF3C7",tx:"#92400E"},"인터렉션":{bg:"#CFFAFE",tx:"#155E75"},
+    "일러스트레이션":{bg:"#FFE4E6",tx:"#9F1239"},"사진":{bg:"#E0F2FE",tx:"#075985"},
+    "입체":{bg:"#DCFCE7",tx:"#166534"},"제품 디자인":{bg:"#F0FDF4",tx:"#14532D"},
+    "영상":{bg:"#FDF4FF",tx:"#6B21A8"},"광고":{bg:"#FFF7ED",tx:"#9A3412"},
+  };
+  grid.innerHTML = rows.map((row, ri) => {
+    const stripImg = s => (s||'').replace(/\[img:https?:\/\/[^\]]+\]/g, '').replace(/\[img:[^\]]*$/g, '').trim();
+    const id     = row["Index"] || (ri + 1);
+    const disc   = row["Discipline"] || '';
+    const year   = row["Year"] || '';
+    const collab = row["Collaboration type"] || '';
+    const ctx    = row["Context"] || '';
+    const stage  = row["Stage of abandonment"] || '';
+    const name   = stripImg(row["Project name"] || '');
+
+    const tableRows = [
+      ['프로젝트', name],
+      ['분야',     disc],
+      ['연도',     year],
+      ['협업',     collab],
+      ['맥락',     ctx],
+      ['중단 단계', stage],
+    ].filter(r => r[1]).map(([l,v]) =>
+      `<tr><td class="pc-label">${esc(l)}</td><td class="pc-val">${esc(v)}</td></tr>`
+    ).join('');
+
+    const discBadge = disc ? `<span class="pc-badge">${esc(disc)}</span>` : '';
+    const yearBadge = year ? `<span class="pc-badge pc-badge-year">${esc(year)}</span>` : '';
+
+    return `<div class="pc" onclick="goEntry('${id}')">
+  <div class="pc-num-large">${String(id).padStart(2,'0')}</div>
+  <div class="pc-title">${esc(name || 'Untitled')}</div>
+  <div class="pc-badges">${discBadge}${yearBadge}</div>
+</div>`;
+  }).join('') +
+  `<div class="upload-card" onclick="showToast('준비 중입니다')">+ 내 프로젝트 공유하기</div>`;
+}
+function sortG(btn, s) { S.gSort = s; document.querySelectorAll('.gallery-controls .fc').forEach(b => b.classList.remove('active')); btn.classList.add('active'); renderGallery(); }
+function setView(btn, v) { S.gView = v; document.querySelectorAll('.vb').forEach(b => b.classList.remove('active')); btn.classList.add('active'); renderGallery(); }
+function goEntry(id) { showPage('archive'); setTimeout(() => document.getElementById('ep-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120); }
+
+/* ── PAGE NAV ── */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.nl').forEach(btn => {
+    btn.classList.toggle('active', (btn.getAttribute('onclick') || '').includes(`'${id}'`));
+  });
+  if (id === 'hardcopy') renderHC();
+  document.getElementById('right-col').scrollTop = 0;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ── FETCH ── */
+fetch(CSV_URL)
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(txt => {
+    ALL = parseCSV(txt);
+    document.getElementById('archive-loading').style.display = 'none';
+    document.getElementById('s-total').textContent = ALL.length;
+    const shuffled = [...ALL].sort(() => Math.random() - 0.5);
+    document.getElementById('archive-body').innerHTML = buildArchive(shuffled);
+    renderGallery();
+
+    // 클릭 리스너를 right-col에 붙임 (archive-body 포함 전체)
+    document.getElementById('right-col').addEventListener('click', function(e) {
+      if (e.target.tagName === 'IMG') return;
+      var seg = e.target.closest('.seg');
+      if (!seg) return;
+      e.stopPropagation();
+
+      var id  = seg.getAttribute('data-id');
+      var key = seg.getAttribute('data-key');
+      if (!id || !key) return;
+
+      activeCP = id + '::' + key;
+      var val = seg.innerText.trim();
+      var color = seg.style.getPropertyValue('--sc') || '#999';
+
+      document.getElementById('cp-label').textContent =
+        '"' + val.substring(0, 60) + (val.length > 60 ? '…' : '') + '"';
+      document.getElementById('cp-label').style.borderLeftColor = color;
+
+      renderCPList();
+
+      var panel = document.getElementById('comment-panel');
+      panel.classList.add('open');
+      panel.style.transform = 'translateY(0)';
+      document.getElementById('cp-input').focus();
+    });
+  })
+  .catch(err => {
+    document.getElementById('archive-loading').textContent = '데이터를 불러오지 못했습니다.';
+    console.error(err);
+  });
+</script>
+</body>
 </html>
