@@ -4,622 +4,563 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Unfinished Idea</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-<!-- COMMENT PANEL bottom-left -->
-<div id="comment-panel">
-  <div id="cp-head">
-    <span id="cp-label"></span>
-    <button id="cp-close" onclick="closeCP()">×</button>
+<nav id="nav">
+  <div id="nav-title" onclick="closeAllModals()">Unfinished<br>Idea</div>
+  <div id="nav-links">
+    <button class="nav-btn" onclick="openSharing()">sharing idea</button>
+    <button class="nav-btn" onclick="openMyBox()">my box</button>
   </div>
-  <div id="cp-list"></div>
-  <div id="cp-input-row">
-    <input id="cp-input" placeholder="댓글 남기기…" onkeydown="if(event.key==='Enter')addComment()"/>
-    <button onclick="addComment()">→</button>
+</nav>
+
+<div id="landing">
+  <div id="blocks-layer"></div>
+  <canvas id="physics-canvas"></canvas>
+</div>
+
+<!-- MY BOX — full-screen background layer -->
+<div id="mybox-page">
+  <div id="mybox-items"></div>
+</div>
+
+<div id="tooltip">
+  <div id="tt-name"></div>
+  <div id="tt-meta"></div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div id="detail-panel">
+  <button id="detail-close" onclick="closeDetail()">×</button>
+  <div id="dp-header">
+    <div id="dc-num"></div>
+    <div id="dc-title"></div>
+  </div>
+  <div id="dp-body">
+    <div id="dp-left">
+      <div id="dc-fields"></div>
+      <div id="dc-desc"></div>
+    </div>
+    <div id="dp-divider"></div>
+    <div id="dp-right">
+      <div id="dc-cmt-list"></div>
+      <div id="dc-cmt-input-area">
+        <div id="dc-cmt-hint"></div>
+        <div id="dc-cmt-row">
+          <textarea id="dc-cmt-input" placeholder="댓글 남기기…" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitCmt();}
+            this.style.height='auto';this.style.height=this.scrollHeight+'px';"></textarea>
+          <button onclick="submitCmt()">→</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- HARDCOPY POPUP (right-click) -->
-<div id="hc-popup">
-  <div id="hcp-text"></div>
-  <div id="hcp-btns">
-    <button class="hcp-yes" onclick="confirmHC()">하드카피에 저장</button>
-    <button class="hcp-no" onclick="closeHCP()">닫기</button>
+<!-- MODAL OVERLAY (sharing idea only) -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeSharing()"></div>
+
+<!-- SHARING IDEA MODAL -->
+<div id="modal-sharing" class="center-modal">
+  <button class="cm-close" onclick="closeSharing()">×</button>
+  <div class="cm-header">
+    <h2>sharing idea</h2>
+    <p class="cm-desc">아직 완성되지 않은 아이디어를 공유해주세요</p>
+  </div>
+  <div class="cm-body">
+    <div class="sf-row">
+      <span class="sf-label">제목</span>
+      <input class="sf-input-field" placeholder="프로젝트 이름"/>
+    </div>
+    <div class="sf-row">
+      <span class="sf-label">분야</span>
+      <input class="sf-input-field" placeholder="타이포그라피, 영상, 3D..."/>
+    </div>
+    <div class="sf-row">
+      <span class="sf-label">연도</span>
+      <input class="sf-input-field" placeholder="2025, 2026..."/>
+    </div>
+    <div class="sf-row">
+      <span class="sf-label">협업</span>
+      <input class="sf-input-field" placeholder="개인, 팀..."/>
+    </div>
+    <div class="sf-row">
+      <span class="sf-label">맥락</span>
+      <input class="sf-input-field" placeholder="수업 과제, 개인 프로젝트, 공모전..."/>
+    </div>
+    <div class="sf-row">
+      <span class="sf-label">중단 단계</span>
+      <input class="sf-input-field" placeholder="기획 중, 작업 중간에, 다 마치고..."/>
+    </div>
+    <div class="sf-row sf-row-top">
+      <span class="sf-label">작업</span>
+      <textarea class="sf-input-field sf-textarea" placeholder="사용한 툴, 작업 방식, 중단 이유, 감정 등 뭐든 적어주세요!"></textarea>
+    </div>
+  </div>
+  <div class="cm-submit-row">
+    <button class="cm-submit" onclick="showToast('준비 중입니다')">제출하기</button>
   </div>
 </div>
 
 <div id="toast"></div>
 
-<!-- LEFT COL fixed -->
-<div id="left-col">
-  <div id="lc-top">
-    <div id="lc-title" onclick="showPage('archive')">Unfinished<br>Idea</div>
-    <nav id="lc-nav">
-      <button class="nl active" onclick="showPage('archive')">Archive</button>
-      <button class="nl" onclick="showPage('gallery')">Gallery</button>
-      <button class="nl" onclick="showPage('hardcopy')">Hardcopy<span id="hc-badge"></span></button>
-    </nav>
-  </div>
-  <div id="lc-bottom">
-    <div id="lc-count"><span id="s-total">—</span></div>
-    <div id="lc-sub">entries</div>
-  </div>
-</div>
-
-<!-- RIGHT COL scrollable -->
-<div id="right-col">
-
-  <!-- ARCHIVE -->
-  <div class="page active" id="page-archive">
-    <div id="archive-loading">loading…</div>
-    <div id="archive-body"></div>
-  </div>
-
-  <!-- GALLERY -->
-  <div class="page" id="page-gallery">
-    <div class="gallery-controls">
-      <button class="fc active" onclick="sortG(this,'num')">번호순</button>
-      <button class="fc" onclick="sortG(this,'disc')">분야순</button>
-      <button class="fc" onclick="sortG(this,'year')">연도순</button>
-      <div class="vt">
-        <button class="vb active" onclick="setView(this,'grid')">Grid</button>
-        <button class="vb" onclick="setView(this,'list')">List</button>
-      </div>
-    </div>
-    <div id="gallery-grid"></div>
-  </div>
-
-  <!-- HARDCOPY -->
-  <div class="page" id="page-hardcopy">
-    <div class="page-head">
-      <div class="ph-title">Hardcopy</div>
-      <div class="ph-sub">클릭해 저장한 항목들</div>
-    </div>
-    <div id="hc-entries"></div>
-    <div id="hc-bar" style="display:none">
-      <span id="hc-info"></span>
-      <button class="export-btn" onclick="window.print()">인쇄 →</button>
-    </div>
-  </div>
-
-</div>
-
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRh6R6DSCq22aA6548mIGHk84h9oL2f83_x6GB60QoCzi5_RCGfNp_SYntKOcrRUJqmn4aJiWDipvJJ/pub?output=csv";
 
-// ══════════════════════════════════════════════════════════
-//  KEYWORDS — 직접 편집하세요
-//  각 필드의 keywords 배열에 형광펜 처리할 단어를 입력
-//  빈 배열 [] 이면 해당 필드는 형광펜 없음
-// ══════════════════════════════════════════════════════════
-const ANSWER_FIELDS = [
-  { key: "Project name",
-    color: "#0004FF",
-    keywords: [] },
-
-  { key: "Discipline",
-    color: "#00FF33",
-    keywords: ["3D","그래픽","타이포그라피","UX/UI","브랜딩","인터렉션","일러스트레이션","사진","입체","제품 디자인","영상","광고"] },
-
-  { key: "Year",
-    color: "#FFAA00",
-    keywords: ["2023","2024","2025","2026"] },
-
-  { key: "Collaboration type",
-    color: "#C700DD",
-    keywords: ["팀","개인"] },
-
-  { key: "Context",
-    color: "#00862D",
-    keywords: ["수업 과제","개인 프로젝트","공모전","동아리 프로젝트","스터디","산학"] },
-
-  { key: "Stage of abandonment",
-    color: "#7AF1DF",
-    keywords: ["기획단계","제작 중","초기","완성","포기","중단"] },
-
-  { key: "Reason for abandonment",
-    color: "#FE1CC5",
-    keywords: ["시간 부족","시간이 없","흥미를","흥미가","의미가 있나","팀원","입대","런했","교수님","피드백","코딩 능력","필라멘트","사양"] },
-
-  { key: "Tool used",
-    color: "#89A8FF",
-    keywords: ["피그마","인디자인","일러스트레이터","포토샵","블렌더","마야","C4D","언리얼","자바스크립트","키샷","라이노","미드저니","프로크리에이트","AfterEffects"] },
-
-  { key: "Emotion",
-    color: "#AC4C21",
-    keywords: ["불안","아쉬움","후련","찝찝","짜증","슬픔","허무","막막","답답","아쉬","기대"] },
-
-  { key: "Description",
-    color: "#DDBEDA",
-    keywords: [] },
+const PALETTE = [
+  "#CA0D0D","#F15411","#FFAA00","#00FF33","#00862D",
+  "#A8E5A6","#7AF1DF","#5289EF","#0004FF","#452C99",
+  "#DDBEDA","#8F0C9E","#EDB4C3","#FE1CC5","#AC4C21",
 ];
 
-// keyword wrap: replaces matched words with <mark> spans
-function wrapKeywords(text, keywords, color) {
-  if (!keywords || keywords.length === 0) return esc(text);
-  const sorted = [...keywords].sort((a, b) => b.length - a.length);
-  let result = esc(text);
-  sorted.forEach(kw => {
-    if (!kw) return;
-    const escKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    result = result.replace(
-      new RegExp(`(${escKw})`, 'g'),
-      `<mark class="kw-mark" data-kc="${color}">$1</mark>`
-    );
-  });
-  return result;
+let ENTRY_COLORS = [];
+function assignColors(){
+  ENTRY_COLORS = ALL.map(() =>
+    PALETTE[Math.floor(Math.random() * PALETTE.length)]
+  );
 }
 
-// Parse field text: split on [img:URL] tags (run on RAW text before esc)
-function parseFieldParts(text) {
-  const parts = [];
-  const re = /\[img:(https?:\/\/[^\]]+)\]/g;
-  let last = 0, m;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push({ type:'text', content: text.slice(last, m.index) });
-    parts.push({ type:'img', content: m[1].trim() });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push({ type:'text', content: text.slice(last) });
-  return parts;
+const FIELD_LABELS = {
+  "Discipline":"분야","Year":"연도","Collaboration type":"협업",
+  "Context":"맥락","Stage of abandonment":"중단 단계",
+  "Reason for abandonment":"중단 이유","Tool used":"사용 툴","Emotion":"감정",
+};
+const FIELD_ORDER = ["Discipline","Year","Collaboration type","Context",
+  "Stage of abandonment","Reason for abandonment","Tool used","Emotion"];
+
+let ALL=[], activeEntry=null, activePage=null, activeSentId=null;
+const SAVED=[];
+const COMMENTS={};
+const FOOTNOTE_ORDER={};
+let myBoxMode=false;
+
+/* ── DATE FORMAT ── */
+function formatDate(date){
+  const yy=String(date.getFullYear()).slice(2);
+  const mm=String(date.getMonth()+1).padStart(2,'0');
+  const dd=String(date.getDate()).padStart(2,'0');
+  const h=date.getHours();
+  const min=String(date.getMinutes()).padStart(2,'0');
+  return `${yy}/${mm}/${dd} ${h}:${min}`;
 }
 
-// Render field value — text only (images extracted separately)
-function renderFieldText(val, keywords, color) {
-  const parts = parseFieldParts(val);
-  return parts
-    .filter(p => p.type === 'text')
-    .map(p => wrapKeywords(p.content, keywords, color))
-    .join('');
-}
-
-// Extract image URLs from field value
-function extractImgUrls(val) {
-  const urls = [];
-  const re = /\[img:(https?:\/\/[^\]]+)\]/g;
-  let m;
-  while ((m = re.exec(val)) !== null) urls.push(m[1].trim());
-  return urls;
-}
-
-const DISC_SLUG = d => ({"3D":"d3","그래픽":"graphic","타이포그라피":"typo","UX/UI":"ux","브랜딩":"brand","인터렉션":"inter","일러스트레이션":"illus","사진":"photo","입체":"solid","제품 디자인":"prod","영상":"video","광고":"ad"}[d] || "graphic");
-
-let ALL = [];
-const S = { hc:[], gSort:'num', gView:'grid', pendingHC:null };
-const COMMENTS = {};
-let activeCP = null;
-let hvTim = null;
-let activeKey = null;
-
-/* ── CSV (handles \r\n, multiline quoted fields) ── */
-function parseCSV(raw) {
-  // Normalize line endings
-  const text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  const rows = [];
-  let headers = null;
-  let i = 0;
-
-  function readField() {
-    if (text[i] === '"') {
-      i++; // skip opening quote
-      let val = '';
-      while (i < text.length) {
-        if (text[i] === '"') {
-          if (text[i+1] === '"') { val += '"'; i += 2; } // escaped quote
-          else { i++; break; } // closing quote
-        } else {
-          val += text[i++];
-        }
-      }
-      return val;
-    } else {
-      let val = '';
-      while (i < text.length && text[i] !== ',' && text[i] !== '\n') {
-        val += text[i++];
-      }
-      return val;
-    }
+/* ── CSV ── */
+function parseCSV(raw){
+  const text=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  const rows=[]; let headers=null,i=0;
+  function rf(){
+    if(text[i]==='"'){i++;let v='';while(i<text.length){if(text[i]==='"'){if(text[i+1]==='"'){v+='"';i+=2;}else{i++;break;}}else v+=text[i++];}return v;}
+    let v='';while(i<text.length&&text[i]!==','&&text[i]!=='\n')v+=text[i++];return v;
   }
-
-  function readRow() {
-    const fields = [];
-    while (i < text.length) {
-      fields.push(readField());
-      if (text[i] === ',') { i++; }
-      else if (text[i] === '\n') { i++; break; }
-      else { break; }
-    }
-    return fields;
-  }
-
-  while (i < text.length) {
-    const fields = readRow();
-    if (!headers) { headers = fields.map(h => h.trim()); }
-    else {
-      const obj = {};
-      headers.forEach((h, j) => { obj[h] = (fields[j] || '').trim(); });
-      if (obj["Project name"]) rows.push(obj);
-    }
-  }
+  function rr(){const f=[];while(i<text.length){f.push(rf());if(text[i]===',')i++;else if(text[i]==='\n'){i++;break;}else break;}return f;}
+  while(i<text.length){const f=rr();if(!headers)headers=f.map(h=>h.trim());else{const o={};headers.forEach((h,j)=>o[h]=(f[j]||'').trim());if(o["Project name"])rows.push(o);}}
   return rows;
 }
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function stripImg(s){return(s||'').replace(/\[img:https?:\/\/[^\]]+\]/g,'').replace(/\[img:[^\]]*$/g,'').trim();}
 
-function esc(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ── SENTENCE HELPERS ── */
+function splitSents(text){
+  if(!text) return [];
+  const parts=text.match(/[^.!?。！？\n]+[.!?。！？]?/g)||[text];
+  return parts.map(s=>s.trim()).filter(s=>s.length>1);
+}
+function sentKey(entryIdx,sid){ return `${entryIdx}__${sid}`; }
+
+function getFootnoteNum(entryIdx,sid){
+  const order=FOOTNOTE_ORDER[entryIdx]||[];
+  const idx=order.indexOf(sid);
+  return idx>=0 ? idx+1 : 0;
 }
 
-/* ── BUILD ARCHIVE ──────────────────────────────────────
-   Each entry = one paragraph
-   Each field = a .seg span
-   Inside active seg: keywords get .kw-mark (fluorescent box)
-   Non-active segs dim to gray
-─────────────────────────────────────────────────────── */
-function buildArchive(rows) {
-  return rows.map((row, ri) => {
-    const id = row["Index"] || (ri + 1);
-
-    const segments = ANSWER_FIELDS.map(({ key, color, keywords }) => {
-      const val = (row[key] || '').trim();
-      if (!val) return '';
-      const cmtKey = `${id}::${key}`;
-      const count = (COMMENTS[cmtKey] || []).length;
-      const dots = count
-        ? `<span class="seg-dots" style="--sc:${color}">${'<i class="seg-dot"></i>'.repeat(count)}</span>`
-        : '';
-
-      // parse [img:URL] inline — images go exactly where written in text
-      const parts = parseFieldParts(val);
-      const inner = parts.map(p => {
-        if (p.type === 'img') {
-          const safeUrl = p.content.replace(/"/g, '&quot;');
-          return `<img class="inline-img" src="${safeUrl}" alt="" loading="lazy"
-            onclick="event.stopPropagation(); toggleImgExpand(this)"
-            onerror="this.style.display='none'"/>`;
-        }
-        return wrapKeywords(p.content, keywords, color);
-      }).join('');
-
-      const segEl = `<span class="seg" data-id="${id}" data-key="${key}" style="--sc:${color}"
-        onmouseenter="segHover(this)" onmouseleave="segLeave()"
-      >${inner}${dots}</span>`;
-      return segEl;
-    }).filter(Boolean);
-
-    if (!segments.length) return '';
-    return `<p class="entry-p" id="ep-${id}" data-id="${id}">${segments.join(' ')}</p>`;
-  }).filter(Boolean).join('\n');
+/* N colored dot circles */
+function buildDots(num, color){
+  return Array(num).fill(
+    `<span class="sent-dot" style="background:${color}"></span>`
+  ).join('');
 }
 
-function segHover(el) {
-  clearTimeout(hvTim);
-  const key = el.dataset.key;
-  if (key === activeKey) return;
-  activeKey = key;
-  document.querySelectorAll('.seg').forEach(s => {
-    const on = s.dataset.key === key;
-    const color = s.style.getPropertyValue('--sc') || '#111';
-    s.classList.toggle('seg-on', on);
-    if (on) {
-      // entire seg text color changes
-      s.style.color = color;
-      s.querySelectorAll('.kw-mark').forEach(m => {
-        m.style.color = m.dataset.kc || color;
-      });
-    } else {
-      s.style.color = '';
-      s.querySelectorAll('.kw-mark').forEach(m => { m.style.color = ''; });
-    }
-  });
+/* Sentence HTML — superscript dots (N = footnote number) */
+function makeSentHtml(text, entryIdx, sid, color){
+  const num=getFootnoteNum(entryIdx,sid);
+  const sup=num>0
+    ? `<sup class="sent-dots">${buildDots(num,color)}</sup>`
+    : '';
+  return `<span class="sent" data-entry="${entryIdx}" data-sid="${sid}"
+    onclick="selectSent(this)"
+  >${esc(text)}${sup}<button class="sent-save" onclick="event.stopPropagation();saveSent(${entryIdx},'${sid}')" title="my box에 저장">+</button></span>`;
 }
 
-function segLeave() {
-  hvTim = setTimeout(() => {
-    activeKey = null;
-    document.querySelectorAll('.seg').forEach(s => {
-      s.classList.remove('seg-on');
-      s.style.color = '';
-      s.querySelectorAll('.kw-mark').forEach(m => { m.style.color = ''; });
+/* ── PHYSICS ── */
+let engine, runner, allBodies=[], domEls=[], hoveredIdx=-1, isDragging=false;
+
+function initPhysics(){
+  const W=window.innerWidth, H=window.innerHeight;
+  const cvs=document.getElementById('physics-canvas');
+  cvs.width=W; cvs.height=H;
+
+  engine=Matter.Engine.create({gravity:{y:1.4}});
+  const world=engine.world;
+  Matter.World.add(world,[
+    Matter.Bodies.rectangle(W/2,H+30,W*2,60,{isStatic:true}),
+    Matter.Bodies.rectangle(-30,H/2,60,H*3,{isStatic:true}),
+    Matter.Bodies.rectangle(W+30,H/2,60,H*3,{isStatic:true}),
+  ]);
+
+  const WS=[100,125,110,90,135,115,95,120,105,130];
+  const HS=[72,85,78,68,80,88,74,82,76,84];
+  const numCols=5, gutter=14, avgW=115;
+  const totalW=numCols*(avgW+gutter);
+  const startX=(W-totalW)/2+avgW/2;
+
+  ALL.forEach((row,i)=>{
+    const col=i%numCols, tier=Math.floor(i/numCols);
+    const w=WS[i%WS.length], h=HS[i%HS.length];
+    const x=startX+col*(avgW+gutter)+(Math.random()-0.5)*8;
+    const y=-200-tier*120;
+    const body=Matter.Bodies.rectangle(x,y,w,h,{
+      restitution:0.08,friction:0.85,frictionAir:0.025,chamfer:{radius:11},
     });
-  }, 80);
-}
-/* ── IMAGE EXPAND ──────────────────────────────────────
-   클릭 → 이미지가 fixed fullscreen 블러 배경으로 확장
-   텍스트는 z-index 높아서 그 위에 그대로 보임
-   스크롤 가능. 다시 클릭하거나 ESC로 닫힘
-─────────────────────────────────────────────────────── */
-let expandedImg = null;
+    body.entryIndex=i;
+    allBodies.push(body);
+    Matter.World.add(world,body);
 
-function toggleImgExpand(img) {
-  if (expandedImg) { collapseImg(); return; }
-  expandImg(img);
-}
-
-function expandImg(img) {
-  expandedImg = img;
-  document.getElementById('img-overlay')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'img-overlay';
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    top: '0', left: '0',
-    width: '100vw', height: '100vh',
-    zIndex: '0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'transparent',
-    opacity: '0',
-    transition: 'opacity 0.25s ease',
-    pointerEvents: 'none',   /* 클릭 이벤트 통과 — 텍스트 클릭 정상 작동 */
+    const el=document.createElement('div');
+    el.className='block';
+    el.style.cssText=`width:${w}px;height:${h}px;`;
+    document.getElementById('blocks-layer').appendChild(el);
+    domEls.push({el,body,w,h});
   });
 
-  const blurImg = document.createElement('img');
-  Object.assign(blurImg.style, {
-    display: 'block',
-    maxWidth: '100vw',
-    maxHeight: '100vh',
-    width: 'auto',
-    height: 'auto',
-    objectFit: 'contain',
-    filter: 'blur(10px) saturate(0.65)',
-    pointerEvents: 'none',
+  const mouse=Matter.Mouse.create(cvs);
+  const mc=Matter.MouseConstraint.create(engine,{mouse,constraint:{stiffness:0.18,render:{visible:false}}});
+  Matter.World.add(world,mc);
+
+  let downPos=null;
+  cvs.addEventListener('mousedown',e=>{downPos={x:e.clientX,y:e.clientY};isDragging=false;});
+  cvs.addEventListener('mousemove',e=>{
+    if(downPos&&Math.hypot(e.clientX-downPos.x,e.clientY-downPos.y)>5)isDragging=true;
+    handleHover(e);
   });
-  blurImg.src = img.src;
-  overlay.appendChild(blurImg);
-
-  const rightCol = document.getElementById('right-col');
-  rightCol.insertBefore(overlay, rightCol.firstChild);
-  requestAnimationFrame(() => { overlay.style.opacity = '1'; });
-}
-
-function collapseImg() {
-  expandedImg = null;
-  const overlay = document.getElementById('img-overlay');
-  if (!overlay) return;
-  overlay.style.opacity = '0';
-  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
-}
-
-/* 스크롤하면 이미지 닫힘 */
-document.getElementById('right-col').addEventListener('scroll', () => {
-  if (expandedImg) collapseImg();
-}, { passive: true });
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') collapseImg(); });
-
-/* ── COMMENT PANEL ── */
-function openCP(el) {
-  // el은 항상 .seg span
-  var id  = el.getAttribute('data-id');
-  var key = el.getAttribute('data-key');
-  if (!id || !key) return;
-
-  var val   = el.innerText || el.textContent || '';
-  val = val.trim();
-  var color = el.style.getPropertyValue('--sc') || '#999';
-  activeCP  = id + '::' + key;
-
-  document.getElementById('cp-label').textContent =
-    '"' + val.substring(0, 60) + (val.length > 60 ? '…' : '') + '"';
-  document.getElementById('cp-label').style.borderLeftColor = color;
-
-  renderCPList();
-
-  var panel = document.getElementById('comment-panel');
-  panel.style.transform = 'translateY(0)';
-  panel.classList.add('open');
-
-  setTimeout(function(){ document.getElementById('cp-input').focus(); }, 50);
-
-  S.pendingHC = { text: val, id: id,
-    source: (ALL.find(function(r){ return r['Index'] === id; }) || {})['Project name'] || '' };
-}
-
-function renderCPList() {
-  const cmts = COMMENTS[activeCP] || [];
-  document.getElementById('cp-list').innerHTML = cmts.length
-    ? cmts.map(c => `<div class="cp-item">
-        <span class="cp-text">${esc(c.text)}</span>
-        <span class="cp-meta">${c.date}${c.time ? ' · ' + c.time : ''}</span>
-      </div>`).join('')
-    : '<div class="cp-empty">아직 댓글이 없습니다</div>';
-}
-
-function addComment() {
-  if (!activeCP) return;
-  const input = document.getElementById('cp-input');
-  const val = input.value.trim();
-  if (!val) return;
-  if (!COMMENTS[activeCP]) COMMENTS[activeCP] = [];
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('ko-KR');
-  const timeStr = now.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
-  COMMENTS[activeCP].push({ text: val, date: dateStr, time: timeStr });
-  input.value = '';
-  renderCPList();
-  // refresh dot badge
-  const [id, key] = activeCP.split('::');
-  document.querySelectorAll(`.seg[data-id="${id}"][data-key="${key}"]`).forEach(el => {
-    let dots = el.querySelector('.seg-dots');
-    const count = COMMENTS[activeCP].length;
-    const color = el.style.getPropertyValue('--sc') || '#999';
-    if (!dots) {
-      dots = document.createElement('span');
-      dots.className = 'seg-dots';
-      dots.style.setProperty('--sc', color);
-      el.appendChild(dots);
-    }
-    dots.innerHTML = '<i class="seg-dot"></i>'.repeat(count);
+  cvs.addEventListener('mouseup',e=>{
+    downPos=null;
+    if(!isDragging)handleClick(e);
+    setTimeout(()=>{isDragging=false;},50);
   });
+  cvs.addEventListener('mouseleave',()=>{
+    hideTooltip();
+    if(hoveredIdx>=0){domEls[hoveredIdx].el.style.background='#111';hoveredIdx=-1;}
+  });
+
+  runner=Matter.Runner.create();
+  Matter.Runner.run(runner,engine);
+  (function loop(){
+    domEls.forEach(({el,body,w,h})=>{
+      const{x,y}=body.position,a=body.angle;
+      el.style.transform=`translate(${x-w/2}px,${y-h/2}px) rotate(${a}rad)`;
+    });
+    requestAnimationFrame(loop);
+  })();
+}
+
+function getBodyAt(x,y){const h=Matter.Query.point(allBodies,{x,y});return h.length?h[0]:null;}
+
+function handleHover(e){
+  if(myBoxMode) return;
+  const r=document.getElementById('physics-canvas').getBoundingClientRect();
+  const body=getBodyAt(e.clientX-r.left,e.clientY-r.top);
+  if(body){
+    const idx=body.entryIndex;
+    if(idx!==hoveredIdx){
+      if(hoveredIdx>=0)domEls[hoveredIdx].el.style.background='#111';
+      domEls[idx].el.style.background=ENTRY_COLORS[idx];
+      hoveredIdx=idx;
+      showTooltip(idx,e);
+    } else positionTooltip(e);
+    document.getElementById('physics-canvas').style.cursor='grab';
+  } else {
+    if(hoveredIdx>=0){domEls[hoveredIdx].el.style.background='#111';hoveredIdx=-1;}
+    hideTooltip();
+    document.getElementById('physics-canvas').style.cursor='default';
+  }
+}
+function handleClick(e){
+  if(myBoxMode) return;
+  const r=document.getElementById('physics-canvas').getBoundingClientRect();
+  const body=getBodyAt(e.clientX-r.left,e.clientY-r.top);
+  if(body)openDetail(body.entryIndex);
+}
+
+function showTooltip(i,e){
+  const row=ALL[i];
+  document.getElementById('tt-name').textContent=stripImg(row["Project name"]||'');
+  document.getElementById('tt-meta').textContent=[row["Discipline"],row["Year"]].filter(Boolean).join(' · ');
+  const tt=document.getElementById('tooltip');
+  tt.style.display='block';
+  positionTooltip(e);
+}
+function positionTooltip(e){
+  const tt=document.getElementById('tooltip');
+  tt.style.left=Math.min(e.clientX+16,window.innerWidth-210)+'px';
+  tt.style.top=Math.max(e.clientY-8,8)+'px';
+}
+function hideTooltip(){document.getElementById('tooltip').style.display='none';}
+
+/* ── DETAIL ── */
+function openDetail(idx){
+  // Close any open nav page first
+  if(activePage==='sharing') closeSharing();
+  if(activePage==='mybox') closeMyBox();
+
+  activeEntry=idx; activeSentId=null;
+  const row=ALL[idx];
+  const color=ENTRY_COLORS[idx];
+  hideTooltip();
+
+  document.getElementById('landing').style.background=color;
+  document.body.style.background=color;
+
+  document.getElementById('dc-num').textContent=String(idx+1).padStart(2,'0');
+  document.getElementById('dc-title').textContent=stripImg(row["Project name"]||'');
+
+  document.getElementById('dc-fields').innerHTML=FIELD_ORDER.map(k=>{
+    const v=row[k]||''; if(!v)return '';
+    const sid=`f_${k.replace(/\s/g,'_')}`;
+    return `<div class="dcf-row">
+      <span class="dcf-label">${FIELD_LABELS[k]||k}</span>
+      <span class="dcf-val">${makeSentHtml(v,idx,sid,color)}</span>
+    </div>`;
+  }).join('');
+
+  const desc=stripImg(row["Description"]||'');
+  const sents=splitSents(desc);
+  document.getElementById('dc-desc').innerHTML=
+    sents.map((s,si)=>makeSentHtml(s,idx,`d${si}`,color)).join(' ');
+
+  renderCmtList(idx);
+  document.getElementById('dc-cmt-hint').textContent='';
+  document.getElementById('dc-cmt-input').value='';
+
+  document.getElementById('detail-panel').classList.add('visible');
+  document.getElementById('physics-canvas').style.pointerEvents='none';
+}
+
+function closeDetail(){
+  document.getElementById('landing').style.background='#fff';
+  document.body.style.background='#fff';
+  document.getElementById('detail-panel').classList.remove('visible');
+  document.getElementById('physics-canvas').style.pointerEvents='auto';
+  activeEntry=null; activeSentId=null;
+}
+
+/* ── SENTENCE CLICK ── */
+function selectSent(el){
+  if(activeEntry===null)return;
+  document.querySelectorAll('.sent.active-sent').forEach(s=>s.classList.remove('active-sent'));
+  el.classList.add('active-sent');
+  activeSentId=el.dataset.sid;
+  const clone=el.cloneNode(true);
+  clone.querySelectorAll('.sent-dots,.sent-save').forEach(e=>e.remove());
+  const text=clone.innerText.trim();
+  document.getElementById('dc-cmt-hint').textContent=`"${text.substring(0,40)}${text.length>40?'…':''}"`;
+  document.getElementById('dc-cmt-input').focus();
+}
+
+function saveSent(entryIdx, sid){
+  const el=document.querySelector(`.sent[data-entry="${entryIdx}"][data-sid="${sid}"]`);
+  if(!el)return;
+  const clone=el.cloneNode(true);
+  clone.querySelectorAll('.sent-save,.sent-dots').forEach(e=>e.remove());
+  const text=clone.innerText.trim();
+  if(SAVED.find(s=>s.text===text)){showToast('이미 저장됨');return;}
+  SAVED.unshift({text, date:formatDate(new Date()), entryIndex:entryIdx});
+  if(myBoxMode){
+    domEls[entryIdx].el.style.background=ENTRY_COLORS[entryIdx];
+    renderMyBox();
+  }
+  showToast('my box에 저장됨 ✓');
+}
+
+function submitCmt(){
+  if(activeEntry===null||!activeSentId)return;
+  const inp=document.getElementById('dc-cmt-input');
+  const val=inp.value.trim(); if(!val)return;
+  const key=sentKey(activeEntry,activeSentId);
+  const isFirst=!(COMMENTS[key]||[]).length;
+  if(!COMMENTS[key])COMMENTS[key]=[];
+  COMMENTS[key].push({text:val,sid:activeSentId,formattedDate:formatDate(new Date())});
+  inp.value='';
+  if(isFirst){
+    if(!FOOTNOTE_ORDER[activeEntry])FOOTNOTE_ORDER[activeEntry]=[];
+    if(!FOOTNOTE_ORDER[activeEntry].includes(activeSentId))
+      FOOTNOTE_ORDER[activeEntry].push(activeSentId);
+  }
+  rerenderAnnotations(activeEntry);
+  renderCmtList(activeEntry);
   showToast('댓글 저장됨');
 }
 
-function closeCP() {
-  const panel = document.getElementById('comment-panel');
-  panel.classList.remove('open');
-  panel.style.transform = '';
-  activeCP = null;
+function rerenderAnnotations(entryIdx){
+  const color=ENTRY_COLORS[entryIdx];
+  document.querySelectorAll(`.sent[data-entry="${entryIdx}"]`).forEach(el=>{
+    const sid=el.dataset.sid;
+    const num=getFootnoteNum(entryIdx,sid);
+    let supEl=el.querySelector('.sent-dots');
+    if(num>0){
+      if(!supEl){
+        supEl=document.createElement('sup');
+        supEl.className='sent-dots';
+        const btn=el.querySelector('.sent-save');
+        el.insertBefore(supEl,btn||null);
+      }
+      supEl.innerHTML=buildDots(num,color);
+    }
+  });
 }
 
-/* ── HARDCOPY (right-click) ── */
-document.addEventListener('contextmenu', e => {
-  const seg = e.target.closest('.seg');
-  if (!seg) return;
-  e.preventDefault();
-  const val = seg.innerText.trim();
-  const id  = seg.dataset.id;
-  S.pendingHC = { text: val, id, source: ALL.find(r => r["Index"] === id)?.["Project name"] || '' };
-  const popup = document.getElementById('hc-popup');
-  document.getElementById('hcp-text').textContent = `"${val.substring(0, 80)}${val.length > 80 ? '…' : ''}"`;
-  popup.style.display = 'block';
-  popup.style.top  = Math.min(e.clientY + window.scrollY + 6, window.scrollY + window.innerHeight - 110) + 'px';
-  popup.style.left = Math.max(Math.min(e.clientX, window.innerWidth - 270), 12) + 'px';
-});
-function confirmHC() {
-  if (!S.pendingHC) return;
-  const { text, id, source } = S.pendingHC;
-  if (S.hc.find(h => h.text === text)) { showToast('이미 저장됨'); }
-  else { S.hc.push({ text, id, source, date: new Date().toLocaleDateString('ko-KR') }); updateBadge(); showToast('저장됨'); }
-  closeHCP();
-}
-function closeHCP() { S.pendingHC = null; document.getElementById('hc-popup').style.display = 'none'; }
-document.addEventListener('click', e => { if (!e.target.closest('#hc-popup')) closeHCP(); });
-function updateBadge() { document.getElementById('hc-badge').textContent = S.hc.length ? ` (${S.hc.length})` : ''; }
-
-/* ── HARDCOPY PAGE ── */
-function renderHC() {
-  const el  = document.getElementById('hc-entries');
-  const bar = document.getElementById('hc-bar');
-  if (!S.hc.length) {
-    el.innerHTML = '<div class="hc-empty">저장된 항목이 없습니다<br>항목을 우클릭해 저장하세요</div>';
-    bar.style.display = 'none'; return;
+/* Right panel: dots on top (horizontal), comment text below */
+function renderCmtList(entryIdx){
+  const color=ENTRY_COLORS[entryIdx];
+  const allCmts=[];
+  Object.keys(COMMENTS).forEach(key=>{
+    if(key.startsWith(`${entryIdx}__`)){
+      const sid=key.split('__')[1];
+      (COMMENTS[key]||[]).forEach(c=>allCmts.push({...c,sid}));
+    }
+  });
+  const el=document.getElementById('dc-cmt-list');
+  if(!allCmts.length){
+    el.innerHTML='<div class="dc-cmt-empty">문장을 클릭해 댓글을 달아보세요</div>';
+    return;
   }
-  bar.style.display = 'flex';
-  document.getElementById('hc-info').textContent = `총 ${S.hc.length}개`;
-  el.innerHTML = S.hc.map((h, i) => `
-<div class="hc-entry">
-  <div class="hc-n">${String(i+1).padStart(2,'0')}</div>
-  <div class="hc-main">
-    <div class="hc-q">${esc(h.text)}</div>
-    <div class="hc-src">← ${esc(h.source)} · ${h.date}</div>
-  </div>
-  <button class="hc-del" onclick="delHC(${i})">×</button>
+  el.innerHTML=allCmts.map(c=>{
+    const num=getFootnoteNum(entryIdx,c.sid);
+    const dotsHtml=num>0
+      ? buildDots(num,color)
+      : `<span class="sent-dot" style="background:${color}"></span>`;
+    return `
+<div class="dc-cmt" onclick="highlightSent('${entryIdx}','${c.sid}')">
+  <div class="dc-dots-row">${dotsHtml}</div>
+  <div class="dc-cmt-text">${esc(c.text)}</div>
+  <div class="dc-cmt-meta">${c.formattedDate}</div>
+</div>`;
+  }).join('');
+}
+
+function highlightSent(entryIdx, sid){
+  document.querySelectorAll('.sent.active-sent').forEach(s=>s.classList.remove('active-sent'));
+  const el=document.querySelector(`.sent[data-entry="${entryIdx}"][data-sid="${sid}"]`);
+  if(el){el.classList.add('active-sent');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+/* ── BLOCK COLORS ── */
+function applyMyBoxBlockColors(){
+  const savedSet=new Set(SAVED.map(s=>s.entryIndex));
+  domEls.forEach(({el},i)=>{
+    el.style.background=savedSet.has(i)?ENTRY_COLORS[i]:'#fff';
+  });
+}
+function revertBlockColors(){
+  domEls.forEach(({el})=>{el.style.background='#111';});
+  hoveredIdx=-1;
+}
+
+/* ── MY BOX (full-screen background) ── */
+function openMyBox(){
+  // Close any open pages first
+  if(activePage==='sharing') closeSharing();
+  if(activeEntry!==null) closeDetail();
+
+  renderMyBox();
+  myBoxMode=true;
+  document.getElementById('landing').style.background='#111';
+  document.body.style.background='#111';
+  applyMyBoxBlockColors();
+  document.getElementById('nav').classList.add('nav-white');
+  document.getElementById('mybox-page').classList.add('visible');
+  activePage='mybox';
+}
+function closeMyBox(){
+  document.getElementById('mybox-page').classList.remove('visible');
+  document.getElementById('nav').classList.remove('nav-white');
+  if(myBoxMode){
+    myBoxMode=false;
+    document.getElementById('landing').style.background='#fff';
+    document.body.style.background='#fff';
+    revertBlockColors();
+  }
+  activePage=null;
+}
+
+function renderMyBox(){
+  const el=document.getElementById('mybox-items');
+  if(!SAVED.length){
+    el.innerHTML='<p class="mybox-empty">저장된 문장이 없습니다<br>문장 옆 + 버튼으로 저장해보세요</p>';
+    return;
+  }
+  // Show date only (no source title)
+  el.innerHTML=SAVED.map((s,i)=>`
+<div class="mybox-item">
+  <button class="mybox-del" onclick="delSaved(${i})">×</button>
+  <div class="mybox-text">"${esc(s.text)}"</div>
+  <div class="mybox-date">${s.date}</div>
 </div>`).join('');
 }
-function delHC(i) { S.hc.splice(i, 1); renderHC(); updateBadge(); }
-
-/* ── GALLERY ── */
-function renderGallery() {
-  let rows = [...ALL];
-  if (S.gSort === 'disc') rows.sort((a, b) => (a["Discipline"] || '').localeCompare(b["Discipline"] || ''));
-  if (S.gSort === 'year') rows.sort((a, b) => (a["Year"] || 0) - (b["Year"] || 0));
-  const grid = document.getElementById('gallery-grid');
-  grid.className = 'gallery-grid' + (S.gView === 'list' ? ' lv' : '');
-  const DC = {
-    "3D":{bg:"#E0E7FF",tx:"#3730A3"},"그래픽":{bg:"#FEE2E2",tx:"#991B1B"},
-    "타이포그라피":{bg:"#EDE9FE",tx:"#5B21B6"},"UX/UI":{bg:"#D1FAE5",tx:"#065F46"},
-    "브랜딩":{bg:"#FEF3C7",tx:"#92400E"},"인터렉션":{bg:"#CFFAFE",tx:"#155E75"},
-    "일러스트레이션":{bg:"#FFE4E6",tx:"#9F1239"},"사진":{bg:"#E0F2FE",tx:"#075985"},
-    "입체":{bg:"#DCFCE7",tx:"#166534"},"제품 디자인":{bg:"#F0FDF4",tx:"#14532D"},
-    "영상":{bg:"#FDF4FF",tx:"#6B21A8"},"광고":{bg:"#FFF7ED",tx:"#9A3412"},
-  };
-  grid.innerHTML = rows.map((row, ri) => {
-    const stripImg = s => (s||'').replace(/\[img:https?:\/\/[^\]]+\]/g, '').replace(/\[img:[^\]]*$/g, '').trim();
-    const id     = row["Index"] || (ri + 1);
-    const disc   = row["Discipline"] || '';
-    const year   = row["Year"] || '';
-    const collab = row["Collaboration type"] || '';
-    const ctx    = row["Context"] || '';
-    const stage  = row["Stage of abandonment"] || '';
-    const name   = stripImg(row["Project name"] || '');
-
-    const tableRows = [
-      ['프로젝트', name],
-      ['분야',     disc],
-      ['연도',     year],
-      ['협업',     collab],
-      ['맥락',     ctx],
-      ['중단 단계', stage],
-    ].filter(r => r[1]).map(([l,v]) =>
-      `<tr><td class="pc-label">${esc(l)}</td><td class="pc-val">${esc(v)}</td></tr>`
-    ).join('');
-
-    const discBadge = disc ? `<span class="pc-badge">${esc(disc)}</span>` : '';
-    const yearBadge = year ? `<span class="pc-badge pc-badge-year">${esc(year)}</span>` : '';
-
-    return `<div class="pc" onclick="goEntry('${id}')">
-  <div class="pc-num-large">${String(id).padStart(2,'0')}</div>
-  <div class="pc-title">${esc(name || 'Untitled')}</div>
-  <div class="pc-badges">${discBadge}${yearBadge}</div>
-</div>`;
-  }).join('') +
-  `<div class="upload-card" onclick="showToast('준비 중입니다')">+ 내 프로젝트 공유하기</div>`;
-}
-function sortG(btn, s) { S.gSort = s; document.querySelectorAll('.gallery-controls .fc').forEach(b => b.classList.remove('active')); btn.classList.add('active'); renderGallery(); }
-function setView(btn, v) { S.gView = v; document.querySelectorAll('.vb').forEach(b => b.classList.remove('active')); btn.classList.add('active'); renderGallery(); }
-function goEntry(id) { showPage('archive'); setTimeout(() => document.getElementById('ep-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120); }
-
-/* ── PAGE NAV ── */
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + id).classList.add('active');
-  document.querySelectorAll('.nl').forEach(btn => {
-    btn.classList.toggle('active', (btn.getAttribute('onclick') || '').includes(`'${id}'`));
-  });
-  if (id === 'hardcopy') renderHC();
-  document.getElementById('right-col').scrollTop = 0;
+function delSaved(i){
+  SAVED.splice(i,1);
+  if(myBoxMode) applyMyBoxBlockColors();
+  renderMyBox();
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+/* ── SHARING IDEA (center modal) ── */
+function openSharing(){
+  // Close any open pages first
+  if(activePage==='mybox') closeMyBox();
+  if(activeEntry!==null) closeDetail();
+
+  document.getElementById('modal-sharing').classList.add('visible');
+  document.getElementById('modal-overlay').classList.add('visible');
+  activePage='sharing';
+}
+function closeSharing(){
+  document.getElementById('modal-sharing').classList.remove('visible');
+  document.getElementById('modal-overlay').classList.remove('visible');
+  activePage=null;
+}
+
+function closeAllModals(){
+  closeSharing();
+  closeMyBox();
+  closeDetail();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(activePage==='mybox') closeMyBox();
+    else if(activePage==='sharing') closeSharing();
+    else if(activeEntry!==null) closeDetail();
+  }
+});
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
 }
 
 /* ── FETCH ── */
 fetch(CSV_URL)
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
-  .then(txt => {
-    ALL = parseCSV(txt);
-    document.getElementById('archive-loading').style.display = 'none';
-    document.getElementById('s-total').textContent = ALL.length;
-    const shuffled = [...ALL].sort(() => Math.random() - 0.5);
-    document.getElementById('archive-body').innerHTML = buildArchive(shuffled);
-    renderGallery();
-
-    // 클릭 리스너를 right-col에 붙임 (archive-body 포함 전체)
-    document.getElementById('right-col').addEventListener('click', function(e) {
-      if (e.target.tagName === 'IMG') return;
-      var seg = e.target.closest('.seg');
-      if (!seg) return;
-      e.stopPropagation();
-
-      var id  = seg.getAttribute('data-id');
-      var key = seg.getAttribute('data-key');
-      if (!id || !key) return;
-
-      activeCP = id + '::' + key;
-      var val = seg.innerText.trim();
-      var color = seg.style.getPropertyValue('--sc') || '#999';
-
-      document.getElementById('cp-label').textContent =
-        '"' + val.substring(0, 60) + (val.length > 60 ? '…' : '') + '"';
-      document.getElementById('cp-label').style.borderLeftColor = color;
-
-      renderCPList();
-
-      var panel = document.getElementById('comment-panel');
-      panel.classList.add('open');
-      panel.style.transform = 'translateY(0)';
-      document.getElementById('cp-input').focus();
-    });
+  .then(r=>{if(!r.ok)throw new Error(r.status);return r.text();})
+  .then(txt=>{
+    ALL=parseCSV(txt);
+    assignColors();
+    initPhysics();
   })
-  .catch(err => {
-    document.getElementById('archive-loading').textContent = '데이터를 불러오지 못했습니다.';
+  .catch(err=>{
+    document.getElementById('landing').innerHTML='<div style="padding:4rem;color:#aaa;font-size:14px">데이터를 불러오지 못했습니다</div>';
     console.error(err);
   });
 </script>
