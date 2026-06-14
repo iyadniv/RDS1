@@ -720,7 +720,7 @@ function buildReceiptDOM(container){
   if(VIEWED.length){
     VIEWED.forEach((v,i)=>{
       const name=(v.engName||v.name);
-      const disp=name.length>21?name.slice(0,20)+'\u2026':name;
+      const disp=name;
       const row=addEl(container,'div',{...mono,display:'grid',gridTemplateColumns:'1fr auto',gap:'0 0.5ch',alignItems:'start'});
       const left=addEl(row,'span',{wordBreak:'break-word',whiteSpace:'normal',paddingLeft:'3ch',textIndent:'-3ch',minWidth:'0'}); left.textContent=String(i+1).padStart(2,'0')+' '+disp;
       const right=addEl(row,'span',{whiteSpace:'nowrap'}); right.textContent=v.openedTime||'';
@@ -734,7 +734,7 @@ function buildReceiptDOM(container){
     addLine(container,'SAVED',{...mono,marginBottom:'0.2rem'});
     SAVED.forEach((s,i)=>{
       const name=s.engName||s.text;
-      const txt=name.length>21?name.slice(0,20)+'\u2026':name;
+      const txt=name;
       const row=addEl(container,'div',{...mono,display:'grid',gridTemplateColumns:'1fr auto',gap:'0 0.5ch',alignItems:'start'});
       const left=addEl(row,'span',{wordBreak:'break-word',whiteSpace:'normal',paddingLeft:'3ch',textIndent:'-3ch',minWidth:'0'}); left.textContent=String(i+1).padStart(2,'0')+' '+txt;
       const right=addEl(row,'span',{whiteSpace:'nowrap'}); right.textContent=s.rawDate?String(s.rawDate.getHours()).padStart(2,'0')+':'+String(s.rawDate.getMinutes()).padStart(2,'0')+':'+String(s.rawDate.getSeconds()).padStart(2,'0'):s.date;
