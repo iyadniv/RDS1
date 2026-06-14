@@ -6,6 +6,7 @@
 <title>Unfinished Idea</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <link rel="stylesheet" href="style.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
@@ -25,6 +26,19 @@
 <!-- MY BOX — full-screen background layer -->
 <div id="mybox-page">
   <div id="mybox-items"></div>
+  <button id="receipt-btn" onclick="directPrint()">print receipt ↗</button>
+</div>
+
+<!-- RECEIPT OVERLAY -->
+<div id="receipt-overlay" class="modal-overlay" onclick="closeReceipt()"></div>
+
+<!-- RECEIPT MODAL -->
+<div id="receipt-modal" class="center-modal" style="width:min(400px,90vw);font-family:'Courier New',monospace;">
+  <button class="cm-close" onclick="closeReceipt()">×</button>
+  <div id="receipt-body" style="flex:1;overflow-y:auto;padding:2.5rem 2.8rem 1rem 1.4rem;line-height:1.7;font-size:12.5px;"></div>
+  <div style="padding:0.8rem 2.2rem 1.4rem;border-top:1px solid #f0f0f0;flex-shrink:0;">
+    <button class="cm-submit" id="receipt-print-btn">PRINT / SAVE</button>
+  </div>
 </div>
 
 <div id="tooltip">
@@ -212,15 +226,11 @@ function initPhysics(){
 
   const WS=[100,125,110,90,135,115,95,120,105,130];
   const HS=[72,85,78,68,80,88,74,82,76,84];
-  const numCols=5, gutter=14, avgW=115;
-  const totalW=numCols*(avgW+gutter);
-  const startX=(W-totalW)/2+avgW/2;
 
   ALL.forEach((row,i)=>{
-    const col=i%numCols, tier=Math.floor(i/numCols);
     const w=WS[i%WS.length], h=HS[i%HS.length];
-    const x=startX+col*(avgW+gutter)+(Math.random()-0.5)*8;
-    const y=-200-tier*120;
+    const x=w/2+Math.random()*(W-w);
+    const y=-100-Math.random()*1800;
     const body=Matter.Bodies.rectangle(x,y,w,h,{
       restitution:0.08,friction:0.85,frictionAir:0.025,chamfer:{radius:11},
     });
@@ -346,9 +356,18 @@ function openDetail(idx){
 
   document.getElementById('detail-panel').classList.add('visible');
   document.getElementById('physics-canvas').style.pointerEvents='none';
+  window._viewOpenedAt=Date.now();
+  window._viewName=stripImg(row["Project name"]||('#'+String(idx+1).padStart(2,'0')));
+  window._viewEngName=row["English name"]||window._viewName;
+  const _od=new Date();
+  window._viewOpenedTime=String(_od.getHours()).padStart(2,'0')+':'+String(_od.getMinutes()).padStart(2,'0')+':'+String(_od.getSeconds()).padStart(2,'0');
 }
 
 function closeDetail(){
+  if(window._viewOpenedAt){
+    VIEWED.push({name:window._viewName, engName:window._viewEngName||window._viewName, openedTime:window._viewOpenedTime||''});
+    window._viewOpenedAt=null;
+  }
   document.getElementById('landing').style.background='#fff';
   document.body.style.background='#fff';
   document.getElementById('detail-panel').classList.remove('visible');
@@ -376,7 +395,9 @@ function saveSent(entryIdx, sid){
   clone.querySelectorAll('.sent-save,.sent-dots').forEach(e=>e.remove());
   const text=clone.innerText.trim();
   if(SAVED.find(s=>s.text===text)){showToast('이미 저장됨');return;}
-  SAVED.unshift({text, date:formatDate(new Date()), entryIndex:entryIdx});
+  const engName=ALL[entryIdx]&&(ALL[entryIdx]["English name"]||ALL[entryIdx]["Project name"])||'';
+  const _now=new Date();
+  SAVED.unshift({text, date:formatDate(_now), rawDate:_now, entryIndex:entryIdx, engName});
   if(myBoxMode){
     domEls[entryIdx].el.style.background=ENTRY_COLORS[entryIdx];
     renderMyBox();
@@ -549,6 +570,287 @@ function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ── RECEIPT ── */
+const VIEWED=[];
+
+function fmtDuration(ms){
+  const s=Math.floor(ms/1000);
+  const mm=String(Math.floor(s/60)%60).padStart(2,'0');
+  const hh=String(Math.floor(s/3600)).padStart(2,'0');
+  const ss=String(s%60).padStart(2,'0');
+  return hh+':'+mm+':'+ss;
+}
+function fmtReceiptDate(ts){
+  const d=new Date(ts);
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  return String(d.getDate()).padStart(2,'0')+'-'+mo+'-'+d.getFullYear()+
+    ' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+function rpad(str,n){ str=String(str||''); while(str.length<n) str+=' '; return str.length>n?str.slice(0,n):str; }
+
+function addLine(parent, text, style){
+  const d=document.createElement('div');
+  d.textContent=text;
+  if(style) Object.assign(d.style, style);
+  parent.appendChild(d);
+  return d;
+}
+function addEl(parent, tag, style){
+  const el=document.createElement(tag);
+  if(style) Object.assign(el.style, style);
+  parent.appendChild(el);
+  return el;
+}
+
+function buildBlockCanvas(width){
+  // Run a separate square simulation (W x W) independent of screen ratio
+  const SIM=width*4; // simulation virtual size (4x for detail)
+
+  const WS=[100,125,110,90,135,115,95,120,105,130];
+  const HS=[72,85,78,68,80,88,74,82,76,84];
+
+  // Use a headless Matter.js simulation at SIM x SIM
+  const simEngine=Matter.Engine.create({gravity:{y:1.4}});
+  const simWorld=simEngine.world;
+  Matter.World.add(simWorld,[
+    Matter.Bodies.rectangle(SIM/2,SIM+30,SIM*2,60,{isStatic:true}),
+    Matter.Bodies.rectangle(-30,SIM/2,60,SIM*3,{isStatic:true}),
+    Matter.Bodies.rectangle(SIM+30,SIM/2,60,SIM*3,{isStatic:true}),
+  ]);
+
+  // Add blocks at same relative positions as real sim but scaled to SIM
+  const simBodies=[];
+  allBodies.forEach((b,i)=>{
+    if(b.entryIndex==null||!domEls[b.entryIndex]) return;
+    const {w,h}=domEls[b.entryIndex];
+    const scale=SIM/window.innerWidth;
+    // Mirror current position scaled to SIM space
+    const sb=Matter.Bodies.rectangle(
+      b.position.x*scale, b.position.y*scale,
+      w*scale*2, h*scale*2,
+      {angle:b.angle, restitution:0.08, friction:0.85, frictionAir:0.025,
+       chamfer:{radius:11*scale}}
+    );
+    sb.blockW=w*scale*2; sb.blockH=h*scale*2;
+    simBodies.push(sb);
+    Matter.World.add(simWorld,sb);
+  });
+
+  // Run simulation until settled
+  for(let t=0;t<200;t++) Matter.Engine.update(simEngine,16.67);
+
+  // Draw onto square canvas
+  const cvs=document.createElement('canvas');
+  cvs.width=width; cvs.height=width;
+  const ctx=cvs.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,width,width);
+  ctx.fillStyle='#111';
+
+  const drawScale=width/SIM;
+  simBodies.forEach(sb=>{
+    const sw=sb.blockW*drawScale, sh=sb.blockH*drawScale;
+    const r=Math.max(1.5, 11*(SIM/window.innerWidth)*drawScale);
+    const sx=sb.position.x*drawScale, sy=sb.position.y*drawScale;
+    ctx.save();
+    ctx.translate(sx,sy); ctx.rotate(sb.angle);
+    ctx.beginPath();
+    ctx.moveTo(-sw/2+r,-sh/2); ctx.lineTo(sw/2-r,-sh/2);
+    ctx.quadraticCurveTo(sw/2,-sh/2,sw/2,-sh/2+r);
+    ctx.lineTo(sw/2,sh/2-r);
+    ctx.quadraticCurveTo(sw/2,sh/2,sw/2-r,sh/2);
+    ctx.lineTo(-sw/2+r,sh/2);
+    ctx.quadraticCurveTo(-sw/2,sh/2,-sw/2,sh/2-r);
+    ctx.lineTo(-sw/2,-sh/2+r);
+    ctx.quadraticCurveTo(-sw/2,-sh/2,-sw/2+r,-sh/2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  });
+
+  Matter.World.clear(simWorld);
+  Matter.Engine.clear(simEngine);
+  return cvs;
+}
+
+function buildReceiptDOM(container){
+  container.innerHTML='';
+  const mono={fontFamily:'"Courier Prime","Courier New",monospace',fontSize:'7px',fontWeight:'400',lineHeight:'1.2'};
+  const now=Date.now();
+  const dateStr=fmtReceiptDate(now);
+
+  // Load Libre Barcode 128 font once
+  if(!document.getElementById('barcode-font-link')){
+    const lnk=document.createElement('link');
+    lnk.id='barcode-font-link';
+    lnk.rel='stylesheet';
+    lnk.href='https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap';
+    document.head.appendChild(lnk);
+  }
+
+  // Title
+  const title=addEl(container,'div',{textAlign:'center',fontFamily:"'Bugrino',sans-serif",fontSize:'20px',letterSpacing:'-0.02em',marginBottom:'0.6rem'});
+  title.textContent='Archive Receipt';
+
+
+  const collRow=addEl(container,'div',{...mono,display:'flex',alignItems:'center',gap:'0.4em',margin:'0.3rem 0'});
+  const collStar=()=>{const s=addEl(collRow,'span',{flex:'1',overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'0.05em'});s.textContent='*'.repeat(20);return s;};
+  collStar();
+  const collLabel=addEl(collRow,'span',{whiteSpace:'nowrap',letterSpacing:'0.12em',fontWeight:'normal'});
+  collLabel.textContent='YOUR COLLECTION';
+  collStar();
+  addEl(container,'div',{height:'0.6rem'});
+
+  const ua=navigator.userAgent;
+  const brName=ua.includes('Chrome')?'Chrome':ua.includes('Safari')?'Safari':ua.includes('Firefox')?'Firefox':'Browser';
+  [
+    ['Date:',    dateStr],
+    ['Browser:', brName],
+    ['Language:',navigator.language||'-'],
+    ['Served by:','iyadniv.github.io'],
+  ].forEach(([k,v])=>{
+    const row=addEl(container,'div',{...mono,display:'flex',whiteSpace:'nowrap'});
+    const key=addEl(row,'span',{minWidth:'8em',flexShrink:'0'}); key.textContent=k;
+    const val=addEl(row,'span',{overflow:'hidden'}); val.textContent=v;
+  });
+
+  addLine(container,'-'.repeat(60),{...mono,margin:'0.6rem 0',overflow:'hidden',whiteSpace:'nowrap'});
+  addLine(container,'CLICKED',{...mono,marginBottom:'0.2rem'});
+
+  if(VIEWED.length){
+    VIEWED.forEach((v,i)=>{
+      const name=(v.engName||v.name);
+      const disp=name.length>21?name.slice(0,20)+'\u2026':name;
+      const row=addEl(container,'div',{...mono,display:'grid',gridTemplateColumns:'1fr auto',gap:'0 0.5ch',alignItems:'start'});
+      const left=addEl(row,'span',{wordBreak:'break-word',whiteSpace:'normal',paddingLeft:'3ch',textIndent:'-3ch',minWidth:'0'}); left.textContent=String(i+1).padStart(2,'0')+' '+disp;
+      const right=addEl(row,'span',{whiteSpace:'nowrap'}); right.textContent=v.openedTime||'';
+    });
+  } else {
+    addLine(container,'   (none)',{...mono,color:'#aaa'});
+  }
+
+  if(SAVED.length){
+    addLine(container,'-'.repeat(60),{...mono,margin:'0.6rem 0',overflow:'hidden',whiteSpace:'nowrap'});
+    addLine(container,'SAVED',{...mono,marginBottom:'0.2rem'});
+    SAVED.forEach((s,i)=>{
+      const name=s.engName||s.text;
+      const txt=name.length>21?name.slice(0,20)+'\u2026':name;
+      const row=addEl(container,'div',{...mono,display:'grid',gridTemplateColumns:'1fr auto',gap:'0 0.5ch',alignItems:'start'});
+      const left=addEl(row,'span',{wordBreak:'break-word',whiteSpace:'normal',paddingLeft:'3ch',textIndent:'-3ch',minWidth:'0'}); left.textContent=String(i+1).padStart(2,'0')+' '+txt;
+      const right=addEl(row,'span',{whiteSpace:'nowrap'}); right.textContent=s.rawDate?String(s.rawDate.getHours()).padStart(2,'0')+':'+String(s.rawDate.getMinutes()).padStart(2,'0')+':'+String(s.rawDate.getSeconds()).padStart(2,'0'):s.date;
+    });
+  }
+
+
+  addEl(container,'div',{height:'1rem'});
+  // Libre Barcode 128 — encode visit date+time
+  const barcodeEl=addEl(container,'div',{
+    fontFamily:"'Libre Barcode 128',cursive",
+    fontSize:'28px', lineHeight:'1',
+    textAlign:'center', margin:'0.4rem 0 0',
+    overflow:'hidden',
+  });
+  // Compact barcode: YYYYMMDDHHMMSS
+  const bd=new Date(now);
+  const barcodeCode=[
+    String(bd.getFullYear()),
+    String(bd.getMonth()+1).padStart(2,'0'),
+    String(bd.getDate()).padStart(2,'0'),
+    String(bd.getHours()).padStart(2,'0'),
+    String(bd.getMinutes()).padStart(2,'0'),
+    String(bd.getSeconds()).padStart(2,'0'),
+  ].join('');
+  barcodeEl.textContent=barcodeCode;
+
+  addEl(container,'div',{height:'0.3rem'});
+  addEl(container,'div',{height:'0.4rem'});
+  const thanks=addEl(container,'div',{textAlign:'center',color:'#111',lineHeight:'2',...mono});
+  thanks.textContent='Thank you for your visit.';
+  const thanks2=addEl(container,'div',{textAlign:'center',color:'#111',...mono});
+  thanks2.textContent='We hope you found some beautiful idea!';
+  addEl(container,'div',{height:'0.5rem'});
+  addLine(container,'* * *',{textAlign:'center',color:'#111',margin:'0.4rem 0',...mono});
+
+
+}
+
+function openReceipt(){
+  buildReceiptDOM(document.getElementById('receipt-body'));
+  document.getElementById('receipt-print-btn').onclick=printReceipt;
+  document.getElementById('receipt-modal').classList.add('visible');
+  document.getElementById('receipt-overlay').classList.add('visible');
+}
+function directPrint(){
+  buildReceiptDOM(document.getElementById('receipt-body'));
+  printReceipt();
+}
+function closeReceipt(){
+  document.getElementById('receipt-modal').classList.remove('visible');
+  document.getElementById('receipt-overlay').classList.remove('visible');
+}
+function printReceipt(){
+  const container=document.getElementById('receipt-body');
+  const origCanvas=container.querySelector('canvas');
+  let tmpImg=null;
+  if(origCanvas){
+    const dataUrl=origCanvas.toDataURL('image/png');
+    tmpImg=document.createElement('img');
+    tmpImg.src=dataUrl;
+    tmpImg.style.cssText='display:block;width:100%;margin-top:0;';
+    origCanvas.parentNode.replaceChild(tmpImg,origCanvas);
+  }
+
+  // Build block snapshot: full screen scale, then crop bottom portion
+  const printPx=212; // 56mm at 96dpi
+  const fullCvs=buildBlockCanvas(printPx);
+  // Crop: take bottom ~60% where blocks pile up
+  // Use full canvas, no crop
+  const snapImgSrc=fullCvs.toDataURL('image/png');
+
+  const ifr=document.createElement('iframe');
+  ifr.style.cssText='position:fixed;width:0;height:0;border:none;visibility:hidden;';
+  document.body.appendChild(ifr);
+  const iDoc=ifr.contentDocument;
+  const iHead=iDoc.head;
+  const iBody=iDoc.body;
+
+  const lnk=iDoc.createElement('link');
+  lnk.rel='stylesheet';
+  lnk.href='https://fonts.googleapis.com/css2?family=Libre+Barcode+128&family=Courier+Prime:wght@400&display=swap';
+  iHead.appendChild(lnk);
+
+  const sty=iDoc.createElement('style');
+  sty.textContent=[
+    "@font-face{font-family:'Bugrino';src:url('BugrinoTrial-Regular.otf') format('opentype');}",
+    '@page{size:56mm auto;margin:3mm 4mm;}',
+    'html,body{width:44mm;margin:0;padding:0;background:#fff;color:#111;}',
+    'body{font-family:"Courier Prime","Courier New",monospace;font-size:6pt;line-height:1.6;}',
+    'div[style*="grid"]{display:grid!important;}',
+    'div[style*="grid-template"]{grid-template-columns:1fr auto!important;}',
+    '@media print{html,body{width:44mm;} img{page-break-inside:avoid;break-inside:avoid;max-width:100%;}}'
+  ].join('');
+  iHead.appendChild(sty);
+
+  iBody.innerHTML=container.innerHTML;
+
+  // Remove any leftover canvas/img snapshot from modal (we add fresh one below)
+  iBody.querySelectorAll('canvas,img[style*="margin-top:0"]').forEach(el=>el.remove());
+
+  const snapImgEl=iDoc.createElement('img');
+  snapImgEl.src=snapImgSrc;
+  snapImgEl.style.cssText='display:block;width:100%;margin:0;page-break-inside:avoid;break-inside:avoid;';
+  iBody.appendChild(snapImgEl);
+
+  // Restore original canvas in main page
+  if(origCanvas && tmpImg){
+    tmpImg.parentNode.replaceChild(origCanvas,tmpImg);
+  }
+
+  setTimeout(()=>{
+    ifr.contentWindow.focus();
+    ifr.contentWindow.print();
+    setTimeout(()=>document.body.removeChild(ifr),1500);
+  },900);
 }
 
 /* ── FETCH ── */
